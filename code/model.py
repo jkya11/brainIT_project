@@ -75,6 +75,8 @@ class Caption_Generator():
                     concated = tf.concat(1, [indices, labels])
                     onehot_labels = tf.sparse_to_dense(
                             concated, tf.pack([self.batch_size, self.n_words]), 1.0, 0.0) # (batch_size, n_words)
+                    # onehot vector
+                    # generation
 
                     logit_words = tf.matmul(output, self.embed_word_W) + self.embed_word_b # (batch_size, n_words)
                     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logit_words, onehot_labels)
@@ -128,9 +130,17 @@ def preProBuildWordVocab(sentence_iterator, word_count_threshold=30): # borrowed
     word_counts = {}
     nsents = 0
     for sent in sentence_iterator:
+        # for in 1len(sent):
+        #     if type(sent(i))==str:
+        #         print '%d' (sent(i))
+      if type(sent) != str:
+          print sent
+          print nsents
+
       nsents += 1
       for w in sent.lower().split(' '):
         word_counts[w] = word_counts.get(w, 0) + 1
+
     vocab = [w for w in word_counts if word_counts[w] >= word_count_threshold]
     print 'filtered words from %d to %d' % (len(word_counts), len(vocab))
 
@@ -163,11 +173,16 @@ batch_size = 128
 n_epochs = 1000
 ###############################################################
 #################### 잡다한 Parameters ########################
+# original dataset
 model_path = './models/tensorflow'
 vgg_path = './data/vgg16.tfmodel'
 data_path = './data'
 feat_path = './data/feats.npy'
-annotation_path = os.path.join(data_path, 'results_20130124.token')
+# annotation_path = os.path.join(data_path, 'results_20130124.token')
+
+# test processed 30k dataset
+annotation_path = os.path.join(data_path, 'newly_processed_flickr30k.token.txt')
+
 ################################################################
 
 
@@ -177,11 +192,21 @@ def train():
     momentum = 0.9
     feats, captions = get_caption_data(annotation_path, feat_path)
     wordtoix, ixtoword, bias_init_vector = preProBuildWordVocab(captions)
-    print wordtoix
+    # print wordtoix
     np.save('data/ixtoword', ixtoword)
 
     index = np.arange(len(feats))
     np.random.shuffle(index)
+
+    # print np.shape(feats)
+    # print np.shape(captions)
+    # print type(captions)
+    # print len(wordtoix)
+    # print len(ixtoword)
+    # print np.shape(bias_init_vector)
+    #
+    # with open('test.py', 'w') as file_:
+    #     file_.write(feats)
 
     feats = feats[index]
     captions = captions[index]
@@ -211,20 +236,24 @@ def train():
                 range(batch_size, len(feats), batch_size)
                 ):
 
+            #load image feature
             current_feats = feats[start:end]
+
+            #load captions
             current_captions = captions[start:end]
 
             current_caption_ind = map(lambda cap: [wordtoix[word] for word in cap.lower().split(' ')[:-1] if word in wordtoix], current_captions)
 
             current_caption_matrix = sequence.pad_sequences(current_caption_ind, padding='post', maxlen=maxlen+1)
             current_caption_matrix = np.hstack( [np.full( (len(current_caption_matrix),1), 0), current_caption_matrix] ).astype(int)
-
+            # mask generate
             current_mask_matrix = np.zeros((current_caption_matrix.shape[0], current_caption_matrix.shape[1]))
             nonzeros = np.array( map(lambda x: (x != 0).sum()+2, current_caption_matrix ))
             #  +2 -> #START# and '.'
 
             for ind, row in enumerate(current_mask_matrix):
                 row[:nonzeros[ind]] = 1
+            #end of mask generation
 
             _, loss_value = sess.run([train_op, loss], feed_dict={
                 image: current_feats,
@@ -325,10 +354,12 @@ def test_tf(test_image_path=None, model_path='./models/model-72', maxlen=30):
     generated_sentence = ' '.join(generated_words)
     print generated_sentence
 
-all_test_feat='./data/feats.npy'
-test(test_feat=all_test_feat, model_path='./models/tensorflow/model-101', maxlen=30)
+# all_test_feat='./data/feats.npy'
+# test(test_feat=all_test_feat, model_path='./models/tensorflow/model-101', maxlen=30)
 # preProBuildWordVocab(sentence_iterator, word_count_threshold=30)
 
 # get_caption_data(annotation_path, feat_path)
 # preProBuildWordVocab(sentence_iterator, word_count_threshold=30)
-# train
+train()
+# test(test_feat='./data/feats.npy', model_path='./models/tensorflow/model-999', maxlen=30)
+# test()
